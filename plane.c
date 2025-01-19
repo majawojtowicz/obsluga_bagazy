@@ -1,25 +1,66 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "plane.h"
+#include "operacje.h"
 
-
-//obsluga samolotu
-
-int create_plane(Plane *plane, char *name, int id, int capacity, int baggage_capacity, char *capitan) {
-    plane->name = name;
-    plane->id = id;
-    plane->capacity = capacity;
-    plane->baggage_capacity = baggage_capacity;
-    plane->capitan = capitan;
-    if (pthread_create(&plane->thread, NULL, plane_start, (void *)plane) != 0) {
-        perror("pthread_create");
-        return -1;
+int main(int argc, char *argv[]) {
+    if (argc != 6) {
+        printf("Usage: %s <plane_id> <id> <capacity> <baggage_capacity> <capitan>\n", argv[0]);
+        exit(1);
     }
-    return 0;
-}
 
-void *plane_start(void *arg) {
-    Plane *plane = (Plane *)arg;
-    // symulacje odlotow i przylotow i schody
+    // Pobranie argumentów z argv
+    int plane_id = atoi(argv[1]);             // ID samolotu
+    int id = atoi(argv[2]);                  // ID aktualnego procesu
+    int capacity = atoi(argv[3]);            // Pojemność samolotu
+    int baggage_capacity = atoi(argv[4]);    // Maksymalna pojemność bagażu
+    char *capitan = argv[5];                 // Nazwa kapitana (ciąg znaków)
+
+    int shmid, semid, msgid;
+    shared_data_t *shared_data;
+
+    // Połączenie z pamięcią dzieloną
+    shmid = shmget(shm_key, sizeof(shared_data_t), 0666);
+    if (shmid == -1) {
+        perror("shmget");
+        exit(1);
+    }
+    shared_data = (shared_data_t *)shmat(shmid, NULL, 0);
+    if (shared_data == (void *)-1) {
+        perror("shmat");
+        exit(1);
+    }
+
+    // Połączenie z semaforami
+    semid = semget(sem_key, 4, 0666);
+    if (semid == -1) {
+        perror("semget");
+        exit(1);
+    }
+
+    // Połączenie z kolejką komunikatów
+    msgid = msgget(msg_key, 0666);
+    if (msgid == -1) {
+        perror("msgget");
+        exit(1);
+    }
+
+    printf("Plane %d (Capitan: %s) started\n", plane_id, capitan);
+fflush(stdout);
+    // Symulacja pracy samolotu
+    sleep(2);
+
+    // Aktualizacja danych w pamięci dzielonej
+    wait_semaphore(semid, 0); // Sekcja krytyczna
+    shared_data->current_plane = id;
+    shared_data->passengers_capacity = capacity;
+    shared_data->baggage_capacity = baggage_capacity;
+    shared_data->finished_planes += 1;
+    signal_semaphore(semid, 0); // Koniec sekcji krytycznej
+
+    printf("Plane %d (Capitan: %s) finished\n", plane_id, capitan);
+fflush(stdout);
+    // Odłączenie pamięci dzielonej
+    shmdt(shared_data);
+    return 0;
 }
