@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -63,4 +64,35 @@ fflush(stdout);
     // Odłączenie pamięci dzielonej
     shmdt(shared_data);
     return 0;
+=======
+#include "plane.h"
+
+void init_plane(Plane *plane, int id, int capacity, int maxBaggage)
+{
+    plane->planeId      = id;
+    plane->capacity     = capacity;
+    plane->maxBaggage   = maxBaggage;
+    plane->currentOnBoard = 0;
+}
+
+void plane_board_passenger(Plane *plane)
+{
+   
+    if (plane->currentOnBoard < plane->capacity) {
+        plane->currentOnBoard++;
+    } else {
+        pthread_mutex_lock(&mutex_log);
+        fprintf(stderr, "[Plane %d] Błąd: samolot jest pełny!\n", plane->planeId);
+        pthread_mutex_unlock(&mutex_log);
+    }
+}
+
+void plane_clear(Plane *plane)
+{
+    plane->currentOnBoard = 0;
+plane->maxBaggage = (rand() % 10) + 5;
+pthread_mutex_lock(&mutex_log);
+    fprintf(stderr, "[Plane %d] Nowy limit bagażu: %d\n", plane->planeId, plane->maxBaggage);
+    pthread_mutex_unlock(&mutex_log);
+>>>>>>> Stashed changes
 }

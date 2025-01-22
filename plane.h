@@ -1,17 +1,20 @@
-#ifndef plane_h
-#define plane_h
+#ifndef PLANE_H
+#define PLANE_H
+
+#include "common.h"
+
 
 typedef struct Plane {
-    char *name;
-    int id;
-    int capacity;
-    int baggage_capacity;
-    char *capitan
+    int planeId;
+    int capacity;       
+    int maxBaggage;     
+    int currentOnBoard; 
+    
 } Plane;
 
-int create_plane(Plane *plane, char *name, int id, int capacity, int baggage_capacity, char *capitan);
 
-void *plane_start(void *arg);
-
-
+void init_plane(Plane *plane, int id, int capacity, int maxBaggage);
+void plane_board_passenger(Plane *plane);  
+void plane_clear(Plane *plane);            
+void *plane_thread(void *arg);
 #endif
