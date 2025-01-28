@@ -59,8 +59,5 @@ typedef struct {
 } Passenger;
 
 
-static inline void safe_perror(const char *msg) {
-    perror(msg);
-}
 
 #endif // COMMON_H
