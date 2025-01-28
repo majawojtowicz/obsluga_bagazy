@@ -1,27 +1,50 @@
-cat main.c
 #include "common.h"
-#include "dispatcher.h"
 #include "plane.h"
 #include "passenger.h"
-#include "captain.h"
 #include "security.h"
-#include <semaphore.h>
+#include "captain.h"
+#include "dispatcher.h"
+#include "operacje.h"
 
-Plane plane1;
 sem_t stairsSem;
+
+Plane globalPlane;
+
+volatile sig_atomic_t noMoreCheckIn = 0;
+
+
+static void noMoreCheckIn_handler(int signo)
+{
+    if (signo == SIGUSR2) {
+        noMoreCheckIn = 1;
+    }
+}
 
 int main(int argc, char *argv[])
 {
+    int total_passengers = 0;
+    int total_planes     = 0;
+    int stairs_capacity  = 0;
+    int plane_capacity   = 0;
+    int max_baggage      = 0;
+
    
+    struct sigaction sa;
+    sa.sa_handler = noMoreCheckIn_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGUSR2, &sa, NULL);
+
+    
     while (1) {
-        printf("Podaj liczbe pasazerow (1..%d): ", MAX_PASSENGERS);
+        printf("Podaj liczbe pasazerow (%d..%d): ", MIN_PASSENGERS, MAX_PASSENGERS);
+        fflush(stdout);
         if (scanf("%d", &total_passengers) != 1) {
-            fprintf(stderr, "Blad wczytywania liczby pasazerow.\n");
-            
+            fprintf(stderr, "Blad wczytywania.\n");
             fseek(stdin,0,SEEK_END);
             continue;
         }
-        if (total_passengers < 1 || total_passengers > MAX_PASSENGERS) {
+        if (total_passengers < MIN_PASSENGERS || total_passengers > MAX_PASSENGERS) {
             fprintf(stderr, "Niewlasciwa liczba pasazerow.\n");
             continue;
         }
@@ -29,13 +52,14 @@ int main(int argc, char *argv[])
     }
 
     while (1) {
-        printf("Podaj liczbe samolotow (1..%d): ", MAX_PLANES);
+        printf("Podaj liczbe samolotow (%d..%d): ", MIN_PLANES, MAX_PLANES_ALLOWED);
+        fflush(stdout);
         if (scanf("%d", &total_planes) != 1) {
-            fprintf(stderr, "Blad wczytywania liczby samolotow.\n");
+            fprintf(stderr, "Blad wczytywania.\n");
             fseek(stdin,0,SEEK_END);
             continue;
         }
-        if (total_planes < 1 || total_planes > MAX_PLANES) {
+        if (total_planes < MIN_PLANES || total_planes > MAX_PLANES_ALLOWED) {
             fprintf(stderr, "Niewlasciwa liczba samolotow.\n");
             continue;
         }
@@ -43,13 +67,14 @@ int main(int argc, char *argv[])
     }
 
     while (1) {
-        printf("Podaj pojemnosc schodow K (1..10): ");
+        printf("Podaj pojemnosc schodow K (%d..%d): ", MIN_STAIRS, MAX_STAIRS);
+        fflush(stdout);
         if (scanf("%d", &stairs_capacity) != 1) {
-            fprintf(stderr, "Blad wczytywania schodow.\n");
+            fprintf(stderr, "Blad wczytywania.\n");
             fseek(stdin,0,SEEK_END);
             continue;
         }
-        if (stairs_capacity < 1 || stairs_capacity > 10) {
+        if (stairs_capacity < MIN_STAIRS || stairs_capacity > MAX_STAIRS) {
             fprintf(stderr, "Niewlasciwa pojemnosc schodow.\n");
             continue;
         }
@@ -57,28 +82,30 @@ int main(int argc, char *argv[])
     }
 
     while (1) {
-        printf("Podaj pojemnosc samolotu P (1..50): ");
+        printf("Podaj pojemnosc samolotu P (%d..%d): ", MIN_CAPACITY, MAX_CAPACITY);
+        fflush(stdout);
         if (scanf("%d", &plane_capacity) != 1) {
-            fprintf(stderr, "Blad wczytywania pojemnosci.\n");
+            fprintf(stderr, "Blad wczytywania.\n");
             fseek(stdin,0,SEEK_END);
             continue;
         }
-        if (plane_capacity < 1 || plane_capacity > 50) {
-            fprintf(stderr, "Niewlasciwa pojemnosc samolotu.\n");
+        if (plane_capacity < MIN_CAPACITY || plane_capacity > MAX_CAPACITY) {
+            fprintf(stderr, "Niewlasciwa pojemnosc.\n");
             continue;
         }
         break;
     }
 
     while (1) {
-        printf("Podaj dopuszczalna wage bagazu Md (1..100): ");
+        printf("Podaj dopuszczalna wage bagazu Md (%d..%d): ", MIN_BAGGAGE, MAX_BAGGAGE);
+        fflush(stdout);
         if (scanf("%d", &max_baggage) != 1) {
-            fprintf(stderr, "Blad wczytywania wagi.\n");
+            fprintf(stderr, "Blad wczytywania.\n");
             fseek(stdin,0,SEEK_END);
             continue;
         }
-        if (max_baggage < 1 || max_baggage > 100) {
-            fprintf(stderr, "Niewlasciwa waga bagazu.\n");
+        if (max_baggage < MIN_BAGGAGE || max_baggage > MAX_BAGGAGE) {
+            fprintf(stderr, "Niewlasciwa waga.\n");
             continue;
         }
         break;
@@ -86,82 +113,92 @@ int main(int argc, char *argv[])
 
     srand(time(NULL));
 
-    init_plane(&plane1, 1, plane_capacity, max_baggage);
-
+ 
+    init_plane(&globalPlane, 1, plane_capacity, max_baggage);
+    
     init_security_stations();
 
-    sem_init(&stairsSem, 0, stairs_capacity);
-
-    msgqid = create_msg_queue();
-    if (msgqid < 0) {
-        fprintf(stderr, "Nie udalo sie stworzyc kolejki komunikatow.\n");
+ 
+    if (sem_init(&stairsSem, 0, stairs_capacity) != 0) {
+        perror("sem_init");
         exit(EXIT_FAILURE);
     }
 
+    
+    int msgqid = create_msg_queue();
+    if (msgqid < 0) {
+        fprintf(stderr, "Nie udalo sie stworzyc kolejki.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    
     int logfd = open("simulation.log", O_CREAT | O_WRONLY | O_TRUNC, 0644);
     if (logfd == -1) {
-        perror("open simulation.log");
+        perror("open log");
     } else {
-        const char *header = "=== Symulacja start ===\n";
-        if (write(logfd, header, strlen(header)) == -1) {
-            safe_perror("write to simulation.log");
-        }
+        const char *txt = "=== Start Symulacji ===\n";
+        write(logfd, txt, strlen(txt));
         close(logfd);
     }
 
-    for (int i = 0; i < total_passengers; i++) {
-        passengers[i].id       = i + 1;
-        passengers[i].weight   = (rand() % (max_baggage+5)) + 1; 
-        passengers[i].gender   = (rand() % 2 == 0) ? 'M' : 'F';
-        passengers[i].isVIP    = ((i % 5) == 0); // co 5-ty to VIP
-        passengers[i].yields   = 0;
-        passengers[i].isChecked = false;
-    }
+    
+    pthread_t *passThreads = malloc(sizeof(pthread_t)* total_passengers);
+    Passenger *passengers  = malloc(sizeof(Passenger)* total_passengers);
 
-    pthread_t passThreads[MAX_PASSENGERS];
     for (int i = 0; i < total_passengers; i++) {
+        passengers[i].id       = i+1;
+       
+        passengers[i].weight   = (rand() % (max_baggage + 15)) + 1;
+        passengers[i].gender   = (rand()%2 == 0)? 'M':'F';
+        passengers[i].isVIP    = (i % 5 == 0); 
+        passengers[i].yields   = 0;
+        passengers[i].isChecked= false;
+
         if (pthread_create(&passThreads[i], NULL, passenger_thread, &passengers[i]) != 0) {
-            safe_perror("pthread_create passenger");
+            perror("pthread_create passenger");
         }
     }
 
+    pthread_t capThread;
     CaptainParams *cp = malloc(sizeof(CaptainParams));
-    cp->plane       = &plane1;
-    cp->flightTime  = 3;   
-    cp->T1          = 10;  // cz 10 sekund (lub do force_departure)
-
-    pthread_t captThread;
-    if (pthread_create(&captThread, NULL, captain_thread, cp) != 0) {
-        safe_perror("pthread_create captain");
+    cp->plane      = &globalPlane;
+    cp->flightTime = 3; 
+    cp->T1         = 10;
+cp->totalPlanes= total_planes;
+    if (pthread_create(&capThread, NULL, captain_thread, cp) != 0) {
+        perror("pthread_create captain");
         free(cp);
-        return 1;
+        exit(EXIT_FAILURE);
     }
 
-    pthread_t dispatcherThreadId;
+  
+    pthread_t dispThread;
     DispatcherParams dp;
     dp.planesCount = total_planes;
-    dp.T1 = 10;
+    dp.T1          = 10;
 
-    if (pthread_create(&dispatcherThreadId, NULL, dispatcher_thread, &dp) != 0) {
-        safe_perror("pthread_create dispatcher");
+    if (pthread_create(&dispThread, NULL, dispatcher_thread, &dp) != 0) {
+        perror("pthread_create dispatcher");
     }
 
-
-    for (int i = 0; i < total_passengers; i++) {
+   
+    for (int i=0; i<total_passengers; i++) {
         pthread_join(passThreads[i], NULL);
     }
+    free(passThreads);
+    free(passengers);
 
-
-    pthread_join(captThread, NULL);
+    
+    pthread_join(capThread, NULL);
     free(cp);
 
-
-    pthread_join(dispatcherThreadId, NULL);
+    pthread_join(dispThread, NULL);
 
     
     remove_msg_queue(msgqid);
+    
     sem_destroy(&stairsSem);
 
-    fprintf(stderr, "Symulacja zakończona.\n");
+    printf("\n--- Symulacja zakończona ---\n\n");
     return 0;
 }
