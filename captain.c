@@ -31,7 +31,7 @@ void *captain_thread(void *arg)
 
         pthread_mutex_lock(&plane->planeLock);
 
-    
+       
         int waited = 0;
         while (!plane->isFull && !force_departure && waited < cp->T1) {
             pthread_mutex_unlock(&plane->planeLock);
@@ -47,7 +47,7 @@ void *captain_thread(void *arg)
         }
 
         if (doDepart) {
-           
+            
             plane->isDeparting = true;
             pthread_cond_broadcast(&plane->planeCond);
 
@@ -55,7 +55,8 @@ void *captain_thread(void *arg)
 sem_wait(&stairsSem);
             
 
-        
+
+            
             printf("[CAPTAIN] Departing planeId=%d (onBoard=%d)\n",
                    plane->planeId, plane->currentOnBoard);
             sleep(cp->flightTime);
@@ -65,11 +66,13 @@ sem_wait(&stairsSem);
                 sem_post(&stairsSem);
             pthread_mutex_lock(&plane->planeLock);
 
+           
             if (plane->planeId > cp->totalPlanes) {
                 pthread_mutex_unlock(&plane->planeLock);
                 break;
             }
 
+           
             force_departure = 0;
             pthread_mutex_unlock(&plane->planeLock);
         }
