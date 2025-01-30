@@ -4,7 +4,12 @@
 
 static volatile sig_atomic_t force_departure = 0;
 
-
+static void captain_signal_handler(int signo)
+{
+    if (signo == SIGUSR1) {
+        force_departure = 1;
+    }
+}
 
 extern sem_t stairsSem; 
 
