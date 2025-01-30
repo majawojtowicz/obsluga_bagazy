@@ -23,10 +23,10 @@ static void noMoreCheckIn_handler(int signo)
 int main(int argc, char *argv[])
 {
     int total_passengers = 0;
-    int total_planes     = 0;
+    int total_planes = 0;
     int stairs_capacity  = 0;
-    int plane_capacity   = 0;
-    int max_baggage      = 0;
+    int plane_capacity= 0;
+    int max_baggage= 0;
 
    
     struct sigaction sa;
@@ -37,17 +37,17 @@ int main(int argc, char *argv[])
 
     
     while (1) {
-        printf("Podaj liczbe pasazerow (%d..%d): ", MIN_PASSENGERS, MAX_PASSENGERS);
+        printf("Podaj liczb pasazerow (%d..%d): ", MIN_PASSENGERS, MAX_PASSENGERS);
         fflush(stdout);
         if (scanf("%d", &total_passengers) != 1) {
             fprintf(stderr, "Blad wczytywania.\n");
             fseek(stdin,0,SEEK_END);
             continue;
         }
-        if (total_passengers < MIN_PASSENGERS || total_passengers > MAX_PASSENGERS) {
+        if ( total_passengers < MIN_PASSENGERS || total_passengers > MAX_PASSENGERS) {
             fprintf(stderr, "Niewlasciwa liczba pasazerow.\n");
             continue;
-        }
+    }
         break;
     }
 
@@ -56,14 +56,14 @@ int main(int argc, char *argv[])
         fflush(stdout);
         if (scanf("%d", &total_planes) != 1) {
             fprintf(stderr, "Blad wczytywania.\n");
-            fseek(stdin,0,SEEK_END);
+            fseek( stdin,0, SEEK_END );
             continue;
         }
         if (total_planes < MIN_PLANES || total_planes > MAX_PLANES_ALLOWED) {
             fprintf(stderr, "Niewlasciwa liczba samolotow.\n");
-            continue;
-        }
-        break;
+        continue;
+    }
+    break;
     }
 
     while (1) {
@@ -132,9 +132,9 @@ int main(int argc, char *argv[])
     }
 
     
-    int logfd = open("simulation.log", O_CREAT | O_WRONLY | O_TRUNC, 0644);
-    if (logfd == -1) {
-        perror("open log");
+    int logfd = open("simulation.log", O_CREAT | O_WRONLY | O_TRUNC, 0644 );
+    if ( logfd == -1) {
+    perror("open log");
     } else {
         const char *txt = "=== Start Symulacji ===\n";
         write(logfd, txt, strlen(txt));
@@ -185,7 +185,7 @@ cp->totalPlanes= total_planes;
     for (int i=0; i<total_passengers; i++) {
         pthread_join(passThreads[i], NULL);
     }
-    free(passThreads);
+free( passThreads);
     free(passengers);
 
     
@@ -197,7 +197,7 @@ cp->totalPlanes= total_planes;
     
     remove_msg_queue(msgqid);
     
-    sem_destroy(&stairsSem);
+sem_destroy(&stairsSem);
 
     printf("\n--- Symulacja zakończona ---\n\n");
     return 0;
