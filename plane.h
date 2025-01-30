@@ -10,11 +10,11 @@ typedef struct Plane {
     int maxBaggage;     
     int currentOnBoard; 
     
-} Plane;
+}  Plane;
 
 
-void init_plane(Plane *plane, int id, int capacity, int maxBaggage);
+void init_plane( Plane *plane, int id, int capacity , int maxBaggage);
 void plane_board_passenger(Plane *plane);  
-void plane_clear(Plane *plane);            
+void plane_clear( Plane *plane);            
 void *plane_thread(void *arg);
 #endif
