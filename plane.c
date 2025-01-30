@@ -4,17 +4,17 @@
 #include <pthread.h>
 #include <stdbool.h>
 
-void init_plane(Plane *plane, int id, int capacity, int maxBaggage)
+void init_plane(Plane  *plane, int  id, int capacity, int maxBaggage)
 {
-    plane->planeId       = id;
-    plane->capacity      = capacity;
+    plane->planeId  = id;
+    plane->capacity = capacity;
     plane->maxBaggage    = maxBaggage;
     plane->currentOnBoard= 0;
 
     pthread_mutex_init(&plane->planeLock, NULL);
     pthread_cond_init(&plane->planeCond, NULL);
 
-    plane->isFull       = false;
+    plane->isFull= false;
     plane->isDeparting  = false;
 }
 
@@ -25,7 +25,7 @@ RETRY:
 
     
     while (plane->isDeparting) {
-        pthread_cond_wait(&plane->planeCond, &plane->planeLock);
+    pthread_cond_wait(&plane->planeCond, &plane->planeLock);
         
     }
 
@@ -34,7 +34,7 @@ RETRY:
        
         plane->currentOnBoard++;
         printf("[PLANE %d] Passenger %d boarded (onBoard=%d/%d)\n",
-               plane->planeId,
+               plane-> planeId,
                passenger_id,
                plane->currentOnBoard,
                plane->capacity);
@@ -43,7 +43,7 @@ RETRY:
         if (plane->currentOnBoard == plane->capacity) {
             plane->isFull = true;
           
-            pthread_cond_broadcast(&plane->planeCond);
+        pthread_cond_broadcast(&plane->planeCond);
         }
 
         pthread_mutex_unlock(&plane->planeLock);
@@ -51,12 +51,12 @@ RETRY:
     else {
         
         int oldId = plane->planeId;
-        printf("[PLANE %d] Passenger %d found plane FULL => waiting for next plane...\n",
+        printf("[PLANE %d] Passenger %d f ound plane FULL => waiting for next plane...\n",
                plane->planeId, passenger_id);
 
        
         while (plane->planeId == oldId) {
-            pthread_cond_wait(&plane->planeCond, &plane->planeLock);
+        pthread_cond_wait(&plane->planeCond, &plane->planeLock);
         }
 
         
@@ -73,14 +73,14 @@ void clear_plane(Plane *plane)
 {
     pthread_mutex_lock(&plane->planeLock);
 
-    plane->currentOnBoard = 0;
-    plane->maxBaggage = (rand() % 10) + 5;
-    plane->planeId++;
+plane->currentOnBoard = 0;
+plane->maxBaggage = (rand() % 10) + 5;
+    plane-> planeId++;
     plane->isFull = false;
     plane->isDeparting = false;
 
     printf("[PLANE %d] Landed & cleared. Baggage limit=%d\n",
-           plane->planeId, plane->maxBaggage);
+           plane-> planeId, plane->maxBaggage);
 
     pthread_cond_broadcast(&plane->planeCond);
     pthread_mutex_unlock(&plane->planeLock);
