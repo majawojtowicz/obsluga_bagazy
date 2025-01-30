@@ -132,14 +132,7 @@ int main(int argc, char *argv[])
     }
 
     
-    int logfd = open("simulation.log", O_CREAT | O_WRONLY | O_TRUNC, 0644 );
-    if ( logfd == -1) {
-    perror("open log");
-    } else {
-        const char *txt = "=== Start Symulacji ===\n";
-        write(logfd, txt, strlen(txt));
-        close(logfd);
-    }
+    
 
     
     pthread_t *passThreads = malloc(sizeof(pthread_t)* total_passengers);
