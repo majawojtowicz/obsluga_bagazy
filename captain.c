@@ -19,17 +19,16 @@ void *captain_thread(void *arg)
     Plane *plane      = cp->plane;
 
     struct sigaction sa;
-    sa.sa_handler = captain_signal_handler;
+    sa.sa_handler =captain_signal_handler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
     sigaction(SIGUSR1, &sa, NULL);
 
-    printf("[CAPTAIN] Thread started. totalPlanes=%d\n", cp->totalPlanes);
+    printf("[CAPTAIN] Thread started totalPlanes=%d\n", cp->totalPlanes);
 
     while (1) {
         bool doDepart = false;
-
-        pthread_mutex_lock(&plane->planeLock);
+pthread_mutex_lock(&plane->planeLock);
 
        
         int waited = 0;
@@ -46,12 +45,11 @@ void *captain_thread(void *arg)
                    plane->planeId, plane->currentOnBoard);
         }
 
-        if (doDepart) {
+        if ( doDepart) {
             
             plane->isDeparting = true;
             pthread_cond_broadcast(&plane->planeCond);
-
-            pthread_mutex_unlock(&plane->planeLock);
+        pthread_mutex_unlock(&plane->planeLock);
 sem_wait(&stairsSem);
             
 
@@ -75,8 +73,8 @@ sem_wait(&stairsSem);
            
             force_departure = 0;
             pthread_mutex_unlock(&plane->planeLock);
-        }
-        else {
+    }
+    else {
            
             pthread_mutex_unlock(&plane->planeLock);
         }
