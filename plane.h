@@ -11,11 +11,11 @@ typedef struct {
     int  maxBaggage;       
     int  currentOnBoard;   
 
-    pthread_mutex_t planeLock;
-    pthread_cond_t  planeCond;
+pthread_mutex_t planeLock;
+pthread_cond_t  planeCond;
 
-    bool isFull;           
-    bool isDeparting;      
+  bool isFull;           
+bool isDeparting;      
 } Plane;
 
 void init_plane(Plane *plane, int id, int capacity, int maxBaggage);
