@@ -5,6 +5,7 @@ typedef struct {
     char mtext[128];
 } Message;
 
+//not used functionally
 int create_msg_queue(void)
 {
     key_t key = ftok( FTOK_PATH, FTOK_CHAR);
