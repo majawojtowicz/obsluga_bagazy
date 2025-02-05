@@ -9,5 +9,7 @@ typedef struct {
 } DispatcherParams;
 
 void *dispatcher_thread(void *arg);
+oid increasePlanesOnDeparture(void); //wolane podczas odlotu samolotu
+void printPassengersStatusOnLand(void);
 
 #endif // DISPATCHER_H

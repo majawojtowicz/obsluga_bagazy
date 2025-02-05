@@ -4,6 +4,9 @@
 #include <pthread.h>
 #include <stdbool.h>
 
+extern volatile int passengersDelivered;
+
+
 void init_plane(Plane  *plane, int  id, int capacity, int maxBaggage)
 {
     plane->planeId  = id;
@@ -20,7 +23,7 @@ void init_plane(Plane  *plane, int  id, int capacity, int maxBaggage)
 
 void board_passenger(Plane *plane, int passenger_id)
 {
-RETRY:
+
     pthread_mutex_lock(&plane->planeLock);
 
     
@@ -38,6 +41,8 @@ RETRY:
                passenger_id,
                plane->currentOnBoard,
                plane->capacity);
+            
+        passengersDelivered++;
 
         
         if (plane->currentOnBoard == plane->capacity) {
@@ -64,8 +69,18 @@ RETRY:
         pthread_mutex_unlock(&plane->planeLock);
 
         
-        goto RETRY;
     }
+}
+
+void disembark_passenger(Plane *plane, int passenger_id)
+{
+    RETRY:
+    pthread_mutex_lock(&plane->planeLock);
+
+    //plane->currentOnBoard--;
+
+    pthread_mutex_unlock(&plane->planeLock);       
+    goto RETRY;    
 }
 
 
@@ -75,7 +90,7 @@ void clear_plane(Plane *plane)
 
 plane->currentOnBoard = 0;
 plane->maxBaggage = (rand() % 10) + 5;
-    plane-> planeId++;
+    //plane-> planeId++;
     plane->isFull = false;
     plane->isDeparting = false;
 

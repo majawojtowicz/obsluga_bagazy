@@ -6,11 +6,22 @@
 #include "dispatcher.h"
 #include "operacje.h"
 
-sem_t stairsSem;
+sem_t stairsSem[100];
 
-Plane globalPlane;
+Plane globalPlane[100];
+
+volatile PassengerStatus* status;
 
 volatile sig_atomic_t noMoreCheckIn = 0;
+
+volatile int currentPlanesOperating=1; // startujemy z jednym samolotem
+volatile int passengersDelivered = 0;
+volatile int passengersDeclined=0;
+
+int maxPlanesOperating=-1;
+
+int total_passengers = -1;
+int stairs_capacity  = -1;
 
 
 static void noMoreCheckIn_handler(int signo)
@@ -22,9 +33,7 @@ static void noMoreCheckIn_handler(int signo)
 
 int main(int argc, char *argv[])
 {
-    int total_passengers = 0;
     int total_planes = 0;
-    int stairs_capacity  = 0;
     int plane_capacity= 0;
     int max_baggage= 0;
 
@@ -65,6 +74,8 @@ int main(int argc, char *argv[])
     }
     break;
     }
+
+    maxPlanesOperating = total_planes;
 
     while (1) {
         printf("Podaj pojemnosc schodow K (%d..%d): ", MIN_STAIRS, MAX_STAIRS);
@@ -114,15 +125,23 @@ int main(int argc, char *argv[])
     srand(time(NULL));
 
  
-    init_plane(&globalPlane, 1, plane_capacity, max_baggage);
+    printf ("Flota samolotow:\n");
+
+    for (int plane=0; plane<total_planes;plane++) {
+        init_plane(&globalPlanes[plane], plane, plane_capacity, max_baggage);      
+        printf("[PLANE %d] with wing registration number: %p\n", globalPlanes[plane].planeId, &globalPlanes[plane]); 
+    } 
     
     init_security_stations();
 
- 
-    if (sem_init(&stairsSem, 0, stairs_capacity) != 0) {
-        perror("sem_init");
-        exit(EXIT_FAILURE);
+ for (int stair=0;stair<total_planes;stair++)
+    {      
+        if (sem_init(&stairsSem[stair], 0, stairs_capacity) != 0) {
+            perror("sem_init");
+            exit(EXIT_FAILURE);
+        }
     }
+   
 
     
     int msgqid = create_msg_queue();
@@ -144,31 +163,47 @@ int main(int argc, char *argv[])
     
     pthread_t *passThreads = malloc(sizeof(pthread_t)* total_passengers);
     Passenger *passengers  = malloc(sizeof(Passenger)* total_passengers);
+status = malloc(sizeof(PassengerStatus)* total_passengers);
 
     for (int i = 0; i < total_passengers; i++) {
-        passengers[i].id       = i+1;
+        passengers[i].id       = i;
        
         passengers[i].weight   = (rand() % (max_baggage + 15)) + 1;
         passengers[i].gender   = (rand()%2 == 0)? 'M':'F';
         passengers[i].isVIP    = (i % 5 == 0); 
         passengers[i].yields   = 0;
         passengers[i].isChecked= false;
+        passengers[i].assignedPlaneNumber=-1; // to bedzie pszypisane po wyjsciu z kontroli, ale przed wejsciem na schody (losowo)
+        passengers[i].onStairs=false;
+        passengers[i].delivered=false;
+
+        //poczatkowy status uzywany pozniej do wypisywania stanu (overview) calej symulacji, przy kazdym wylocie samolotu
+        status[i].overweight=false;
+        status[i].assignedPlaneNumber=-1;
+        status[i].onStairs=false;
+        status[i].airborne=false;
+        status[i].delivered=false;
 
         if (pthread_create(&passThreads[i], NULL, passenger_thread, &passengers[i]) != 0) {
             perror("pthread_create passenger");
         }
     }
 
-    pthread_t capThread;
-    CaptainParams *cp = malloc(sizeof(CaptainParams));
-    cp->plane      = &globalPlane;
-    cp->flightTime = 3; 
-    cp->T1         = 10;
-cp->totalPlanes= total_planes;
-    if (pthread_create(&capThread, NULL, captain_thread, cp) != 0) {
-        perror("pthread_create captain");
-        free(cp);
-        exit(EXIT_FAILURE);
+    pthread_t *captThreads = malloc(sizeof(pthread_t)* total_planes);
+    CaptainParams *captains  = malloc(sizeof(CaptainParams)* total_planes);
+    for (int i=0;i<total_planes;i++)
+    {
+        //pthread_t capThread;
+        //CaptainParams *cp = malloc(sizeof(CaptainParams));
+        captains[i].plane      = &globalPlanes[i];
+        captains[i].flightTime = 3; 
+        captains[i].T1         = 10;
+        captains[i].totalPlanes= total_planes;
+        if (pthread_create(&captThreads[i], NULL, captain_thread, &captains[i]) != 0) {
+            perror("pthread_create captain");
+            exit(EXIT_FAILURE);
+        }
+        //pthread_join(captThreads[i], NULL);
     }
 
   
@@ -189,15 +224,15 @@ free( passThreads);
     free(passengers);
 
     
-    pthread_join(capThread, NULL);
-    free(cp);
 
     pthread_join(dispThread, NULL);
+    pthread_join(captThreads[0], NULL);
 
     
-    remove_msg_queue(msgqid);
+    //remove_msg_queue(msgqid);
     
-sem_destroy(&stairsSem);
+    for (int stair=0; stair<total_planes;stair++)
+        sem_destroy(&stairsSem[stair]);
 
     printf("\n--- Symulacja zakończona ---\n\n");
     return 0;

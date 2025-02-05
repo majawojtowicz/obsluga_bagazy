@@ -55,8 +55,19 @@ typedef struct {
     char gender;     
     bool isVIP;      
     int  yields;     
-    bool isChecked;  
+    bool isChecked;
+    bool onStairs;
+    bool delivered;
+    int  assignedPlaneNumber;
 } Passenger;
+
+typedef struct {
+    bool overweight;
+    int assignedPlaneNumber;
+    bool onStairs;
+    bool airborne;
+    bool delivered;
+} PassengerStatus;
 
 
 
