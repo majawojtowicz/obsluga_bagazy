@@ -1,80 +1,39 @@
 #include "dispatcher.h"
-#include <signal.h>
+#include <sys/prctl.h>
 
-extern volatile sig_atomic_t noMoreCheckIn;
-extern int maxPlanesOperating;
-extern volatile int currentPlanesOperating;
-extern volatile PassengerStatus* status;
-extern int total_passengers;
-extern volatile int passengersDelivered;
-extern volatile int passengersDeclined;
+const char * dispatcherName = "AirportDispatcher";
 
-void *dispatcher_thread(void *arg)
-{
-    DispatcherParams *dp = ( DispatcherParams*)arg;
+void dispatcherRun(pid_t terminalPid, pid_t securityPid, pid_t departuresPid) {
 
-    printf("[DISPATCHER] Thread started. planesCount=%d\n", dp->planesCount);
+	// ustaw nazwe procesu, zeby bylo widoczne na ptree
+    if (prctl(PR_SET_NAME, (unsigned long) dispatcherName) < 0)
+    {
+        perror("prctl()");
+    }
 
-    
-    int forced = 0;
-    while (forced < 2) {
-    sleep( 5 );
-        printf("[DISPATCHER] Sending SIGUSR1 (force_departure)\n");
-    kill( getpid(), SIGUSR1);
-        forced++;
+	while (1)
+	{
+		sleep(1+rand()%5);
+
+		// i wylosujmy jakas operacje
+		int operation = rand()%3;
+		printf("Dispatcher operation in progress:%d\n", operation);
+
+		switch (operation) {
+			case EVACUATE:
+				printf ("ATTENTION! All passengers request to evacuate from the airport...\n");
+				kill(terminalPid, SIGUSR1);
+				kill(securityPid, SIGUSR1);
+				kill(departuresPid, SIGUSR1);
+			break;
+			case FORCED_DEPART:
+				printf ("ATTENTION! All airplanes requested to depart...\n");
+			break;
+			case NO_CHECKIN:
+				printf ("ATTENTION! No more checkins...\n");
+			break;
+			default:
+			printf("Dispatch operation not supported...\n");
+		}
+	}
 }
-
-    sleep(5);
-    printf("[DISPATCHER] Sending SIGUSR2 => no more check-in.\n");
-    kill(getpid(), SIGUSR2);
-
-    printf("[DISPATCHER] Finished.\n");
-    return NULL;
-}
-
-void increasePlanesOnDeparture(void) {
-    if (passengersDelivered+passengersDeclined<total_passengers && currentPlanesOperating < maxPlanesOperating-1) 
-        {
-            currentPlanesOperating++;
-            printf("[DISPATCHER] Bringing in new plane, so now %d operating\n",currentPlanesOperating);
-        }
-}
-
-void printPassengersStatusOnLand(void) {
-    printf("Passengers status:\n");
-
-    for (int i=0;i<total_passengers;i++) 
-        {
-        if (status[i].overweight)
-            printf("o");
-            else printf(" ");
-        }
-        printf("\n");
-    
-    for (int i=0;i<total_passengers;i++) 
-        {
-        if (status[i].assignedPlaneNumber>=0)
-            printf("%d", status[i].assignedPlaneNumber);
-            else printf("-");
-        }
-        printf("\n");
-
-    for (int i=0;i<total_passengers;i++) 
-        {
-            if (status[i].onStairs) printf("#"); else printf(" ");
-        }
-        printf("\n");
-    for (int i=0;i<total_passengers;i++) 
-        {
-            if (!status[i].overweight)
-                {
-                    if (status[i].delivered) printf("+"); else if (status[i].airborne) printf("~");
-                }
-                else printf(" ");
-        }
-        printf("\n");
-        printf("Passengers declined (overweight):%d\n", passengersDeclined);
-        printf("Passengers delivered:%d/%d\n", passengersDelivered, total_passengers);
-        printf("\n");
-}
-

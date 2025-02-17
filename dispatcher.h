@@ -3,13 +3,12 @@
 
 #include "common.h"
 
-typedef struct {
-    int planesCount; 
-    int T1;          
-} DispatcherParams;
+void dispatcherRun(pid_t terminalPid, pid_t securityPid, pid_t departuresPid);
 
-void *dispatcher_thread(void *arg);
-oid increasePlanesOnDeparture(void); //wolane podczas odlotu samolotu
-void printPassengersStatusOnLand(void);
+enum Event {
+	EVACUATE,
+	FORCED_DEPART,
+	NO_CHECKIN
+};
 
 #endif // DISPATCHER_H
