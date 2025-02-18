@@ -2,14 +2,13 @@
 #define CAPTAIN_H
 
 #include "common.h"
-#include "plane.h"
 
 typedef struct {
-    Plane *plane;
-    int   flightTime;   
-    int   T1;           
-    int   totalPlanes;  
-} CaptainParams;
+	int gateNumber; // aka numer samolotu
+	int planeCapacity; // calkowita pojemnosc
+	int onboarded; //ile obecnie
+} Captain;
+
 
 void *captain_thread(void *arg);
 

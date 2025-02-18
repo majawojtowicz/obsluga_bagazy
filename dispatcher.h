@@ -11,4 +11,4 @@ enum Event {
 	NO_CHECKIN
 };
 
-#endif // DISPATCHER_H
+#endif //DISPATCHER_H
