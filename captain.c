@@ -1,119 +1,124 @@
+#include <mqueue.h>
 #include "captain.h"
-#include <signal.h>
-#include <stdbool.h>
-#include "dispatcher.h"
+#include <stdlib.h>
+#include <assert.h>
+#include <stdint.h>
 
-extern volatile int passengersDelivered;
-extern volatile int passengersDeclined;
-extern volatile int currentPlanesOperating;
+extern volatile bool forceDepartureStairs[]; //uzywane do przeslania informacji o force depart do schodow, zeby je zwolnic
+extern volatile bool forceDeparturePlanes[]; //uzywane przez schody do wyslania samolotow
+extern volatile bool airbornePlanes[]; //uzywane do przechowania status samolotow (0 - przy gate; 1 - w powietrzu)
+extern volatile int planesOnboarded[];
+
+extern volatile int currentPlanes;
+
+extern int total_planes;
 extern int total_passengers;
+//extern int stairs_capacity;
+//extern int max_baggage;
+//extern int plane_capacity; 
 
-static volatile sig_atomic_t force_departure = 0;
-static volatile sig_atomic_t noMoreCheckIn = 0;
-
-static void captain_signal_handler(int signo)
-{
-    if (signo == SIGUSR1) {
-        force_departure = 1;
-    }
-    if (signo == SIGUSR2) {
-        noMoreCheckIn = 1;
-    }
-}
-
-extern sem_t stairsSem; 
 
 void *captain_thread(void *arg)
 {
-    CaptainParams *cp = (CaptainParams*)arg;
-    Plane *plane      = cp->plane;
+    //int gateNumber = (int)(uintptr_t)arg; 
+    Captain* captain = (Captain *) arg;
 
-    struct sigaction sa;
-    sa.sa_handler =captain_signal_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sigaction(SIGUSR1, &sa, NULL);
+    int shmid;
+    Passenger *passengers;
+    sem_t* semptr;
+    int passengersList[100];
 
-     printf("[CAPTAIN %d] Thread started\n", plane->planeId);
-
-    // oczekuj na zwiekszenie ilosci samolotow (dyspozytor)
-    while (currentPlanesOperating<plane->planeId+1) {
-        sleep(1);
+    // dobierzmy sie do pamieci wspoldzielonej z danymi pasazerow...
+    key_t kls = ftok(".", 'X');
+    shmid = shmget(kls, total_passengers*sizeof(Passenger), IPC_CREAT|0660);
+    if ((int) shmid == -1) {
+       perror("\t\t\t\tError occured during shmid() call\n");
+       exit(1);
     }
-    // wyczysc poprzednie (zanim zaczelismy latac) force_departure
-    force_departure=0;
+    passengers = (Passenger *) shmat (shmid, 0, 0);
 
-printf("[CAPTAIN %d] plane summoned by the dispatcher.\n", plane->planeId);
+    if ((int) passengers == -1) {
+       perror("\t\t\t\tError occured during shmat() call\n");
+       exit(1);
+    }
 
-    while (1) {
-        bool doDepart = false;
-pthread_mutex_lock(&plane->planeLock);
+    semptr = sem_open(SemaphoreName, /* name */
+                            O_CREAT, /* create the semaphore */
+                            AccessPerms, /* protection perms */
+                            0); /* initial value */
+    if (semptr == (void*) -1) printf("sem_open");
 
-       
-        int waited = 0;
-        while (!plane->isFull && !force_departure && waited < cp->T1) {
-            pthread_mutex_unlock(&plane->planeLock);
-            sleep(1);
-            waited++;
-            pthread_mutex_lock(&plane->planeLock);
-        }
+    printf("\t\t\t\t\tSamolot przy gate:%d!\n",captain->gateNumber);
 
-        if (plane->isFull || force_departure || (waited >= cp->T1)) {
-            doDepart = true;
-                printf("[CAPTAIN] Plane %d ready to depart (onBoard=%d)\n",
-                   plane->planeId, plane->currentOnBoard);
-                   if (plane->isFull) printf(" being full\n");
-                    else if (force_departure) printf(" forced by dispatcher\n");
-                    else if (waited>=cp->T1) printf(" overtime\n");
-        }
+    char planemq[10];
+    snprintf(planemq, 12, "/Stairs%d", captain->gateNumber);
 
-        if ( doDepart) {
-            
-            plane->isDeparting = true;
-            pthread_cond_broadcast(&plane->planeCond);
-        pthread_mutex_unlock(&plane->planeLock);
-sem_wait(&stairsSem[plane->planeId]);
-            
+    // odbieramy pasazerow ze schodow
+    mqd_t mqs = mq_open (planemq, O_RDONLY | O_NONBLOCK);
+    assert (mqs != -1);
+
+    /* Get the message queue attributes */
+    struct mq_attr attr;
+    assert (mq_getattr (mqs, &attr) != -1);
+
+    char *buffer = calloc (attr.mq_msgsize, 1);
+    assert (buffer != NULL);
 
 
-            
-            printf("[CAPTAIN] Departing planeId=%d (onBoard=%d)\n",
-                   plane->planeId, plane->currentOnBoard);
+    planesOnboarded[captain->gateNumber]=0;
 
-            //popros dyspozytora o podstawienie kolejnego samolotu 
-            increasePlanesOnDeparture();
+    while(1) {
+        while (!(captain->gateNumber<currentPlanes)) {sleep(1);} //czekamy na nasza kolej
+        // odbieramy pasazerow ze schodow jedynie jesli nie jestesmy pelni lub nie ma forced departure
+        if (!forceDeparturePlanes[captain->gateNumber] && captain->onboarded<captain->planeCapacity) 
+        {
+            unsigned int priority = 0;
+            if ((mq_receive (mqs, buffer, attr.mq_msgsize, &priority)) != -1) {
+                //odebralismy, to zwiekszym current o 1
+                passengersList[captain->onboarded]=atoi(buffer); // dodajmy pasazera do list
+                captain->onboarded++;  
+                planesOnboarded[captain->gateNumber]++;              
 
-            pthread_mutex_lock(&plane->planeLock);
-            //nie pozwalaj na disembark podczas lotu samolotu
-            
-            sleep(cp->flightTime);
-            pthread_mutex_unlock(&plane->planeLock);
+                if (!sem_wait(semptr)) {
+                    passengers[atoi(buffer)].status=5;
+                    passengers[atoi(buffer)].assignedPlaneNumber = captain->gateNumber;
+                    sem_post(semptr);
+                }
 
-
-            printf("[CAPTAIN %d] Plane landed. Disembarked plane...\n", plane->planeId);
-            clear_plane(plane);
-                sem_post(&stairsSem)[plane->planeId];
-            pthread_mutex_lock(&plane->planeLock);
-
-           
-           printPassengersStatusOnLand();
-            if (plane->planeId > cp->totalPlanes) {
-                pthread_mutex_unlock(&plane->planeLock);
-                break;
+                printf ("\t\t\t\t\tPlane %d onboarded '%s' (%d/%d).\n", captain->gateNumber, buffer, captain->onboarded, captain->planeCapacity);
             }
-
-           
-            force_departure = 0;
-            pthread_mutex_unlock(&plane->planeLock);
-    }
-    else {
-           
-            pthread_mutex_unlock(&plane->planeLock);
         }
-    if (passengersDelivered+passengersDeclined==total_passengers || noMoreCheckIn) break;
+        else {
+            if (forceDeparturePlanes[captain->gateNumber]) {
+                printf("\t\t\t\t\tPlane %d is forced to depart!\n", captain->gateNumber);
+                forceDeparturePlanes[captain->gateNumber]=false;
+            }
+            if (captain->onboarded>=captain->planeCapacity) {
+                printf("\t\t\t\t\tPlane %d is full. Departing!\n", captain->gateNumber);   
+            }
+            airbornePlanes[captain->gateNumber]=true;
+            //zwieksz ilosc samolotow, jesli mozesz
+            if (currentPlanes<total_planes) {
+                currentPlanes++;
+                printf("Added new plane:%d\n", currentPlanes-1);
+            }
+            sleep(FLIGHT_TIME);
+            printf("\t\t\t\t\tPlane %d has landed in its destination.\n", captain->gateNumber);
+            //rozladuj podroznych
+            if (!sem_wait(semptr)) {
+                for (int i=0;i<captain->onboarded;i++) passengers[passengersList[i]].status=6;
+                sem_post(semptr);
+            }
+            captain->onboarded=0;
+            planesOnboarded[captain->gateNumber]=0;
+            
+            sleep(FLIGHT_TIME);
+            printf("\t\t\t\t\tPlane %d is back.\n", captain->gateNumber);            
+            airbornePlanes[captain->gateNumber]=false;
+        }
+        usleep(CAPTAIN_WAIT);
+        //printf("Gate %d is going to sleep...\n", stairs->gateNumber);
     }
 
-    if (passengersDelivered+passengersDeclined==total_passengers) printf("[CAPTAIN %d] No more passangers to take. Exiting.\n", plane->planeId);
-    else if (noMoreCheckIn) printf("[CAPTAIN %d] No more check-in today. Exiting\n", plane->planeId);
     pthread_exit(NULL);
 }
