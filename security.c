@@ -73,12 +73,26 @@ void evacuationReceivedSec()
 	secevacuate = false;	
 }
 
+void endReceivedSec()
+{
+	printf("\t\tCleaning the security checks hall. Good night!\n");
+	sleep(2);
+	mq_close(mqsec);
+	mq_unlink(securityQueue);
+	unlink(s2d);
+	unlink(t2s);
+	exit(0);	
+}
+
+
 void set_evac_handler() {
 	struct sigaction current; /* current setup */
 	sigemptyset(&current.sa_mask); /* clear the signal set */
 	current.sa_flags = 0; /* for setting sa_handler, not sa_action */
 	current.sa_handler = evacuationReceivedSec; /* specify a handler */
 	sigaction(SIGUSR1, &current, NULL); /* register the handler */
+	current.sa_handler = endReceivedSec; /* specify a handler */
+	sigaction(SIGTERM, &current, NULL); /* register the handler */
 }
 
 void create_sec_queue() {

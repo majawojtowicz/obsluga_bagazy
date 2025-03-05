@@ -11,6 +11,7 @@ extern volatile int currentPlanes; //ile obecnie samolotow w powietrzu
 extern volatile int planesOnboarded[];
 
 extern volatile bool evacuate;
+extern volatile bool endingDeparture;
 
 extern const char* s2d;
 
@@ -128,6 +129,12 @@ void *gate_thread(void *arg)
         }
         usleep(DEPARTURES_GATES+rand()%DEPARTURES_GATES);
         //printf("Gate %d is going to sleep...\n", stairs->gateNumber);
+        if (endingDeparture) {
+            //printf("Closing gate:%d", stairs->gateNumber);
+            mq_close(mqd);
+            mq_close(mqs);
+            mq_unlink(planemq);
+        }
     }
 
     pthread_exit(NULL);

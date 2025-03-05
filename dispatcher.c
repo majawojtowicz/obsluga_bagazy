@@ -44,6 +44,10 @@ void printAirportStatus(pid_t terminalPid, pid_t securityPid, pid_t departuresPi
 					printf("!");
 					declined++;
 				}
+				else if (dpassengers[i].status==-4) {
+					printf("#");
+					declined++;
+				}
 				else printf(" ");
 			}
 			printf("\n");
@@ -91,6 +95,8 @@ void printAirportStatus(pid_t terminalPid, pid_t securityPid, pid_t departuresPi
 			kill(securityPid, SIGTERM);
 			kill(departuresPid, SIGTERM);
 			kill(getppid(), SIGTERM);
+			//czyscimy pamiec wspoldzielona
+			shmctl(dshmid, IPC_RMID, NULL);
 			exit(0);
 		}
 

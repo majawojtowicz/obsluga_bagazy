@@ -81,6 +81,7 @@ void *check_thread(void *arg)
     int passId2;
     char buf[3];
 
+    int securityThreat;
     while (1)
     {
         if ((mq_receive (mqsec, buffer, attr.mq_msgsize, &priority)) != -1)
@@ -97,23 +98,38 @@ void *check_thread(void *arg)
                     pass2Gender = passengers[passId2].isFemale;
                     if (pass1Gender==pass2Gender) {
                         //pchnijmy pasazera 2
-                        write(mfd, &passId2, sizeof(int));
-                        if (SEC_GATES_ECHO) printf ("\t\t SecGate %d served two same-sex p's: %d, %d\n", myGate->gateNumber, passId1, passId2);
-                }
-                else {
-                    //wrzucmy z powrotem do kolejki ale na wysokim priority
-                    snprintf(buf, 3, "%d", passId2);
-                    mq_send(mqsec, buf, 3, 64); // przesylamy do stanowisk...
-                    if (SEC_GATES_ECHO) printf("\t\t SecGate %d send back to queue (top) diff-sex p: %d\n", myGate->gateNumber, passId2);
+                        securityThreat = rand()%100;
+                        if (securityThreat < SECURITY_THREAT) {
+                            write(mfd, &passId2, sizeof(int));
+                            if (SEC_GATES_ECHO) printf ("\t\t SecGate %d served two same-sex p's: %d, %d\n", myGate->gateNumber, passId1, passId2);
+                        }
+                        else {
+                            passengers[passId2].status=-4;
+                            printf("\t\t SecGate %d failed check for p:%d\n", myGate->gateNumber, passId2);
+                        }
+                    }
+                    else {
+                        //wrzucmy z powrotem do kolejki ale na wysokim priority
+                        snprintf(buf, 3, "%d", passId2);
+                        mq_send(mqsec, buf, 3, 64); // przesylamy do stanowisk...
+                        if (SEC_GATES_ECHO) printf("\t\t SecGate %d send back to queue (top) diff-sex p: %d\n", myGate->gateNumber, passId2);
                     }
                 }
-                write(mfd,&passId1, sizeof(int));
-                //if (SEC_GATES_ECHO) perror("\t\t Issues in sending?");
+                //odrzucajmy jednego na 20 pasazerow
+                securityThreat = rand()%100;
+                if (securityThreat < SECURITY_THREAT) {
+                    write(mfd,&passId1, sizeof(int));
+                    //if (SEC_GATES_ECHO) perror("\t\t Issues in sending?");
+                    }
+                else {
+                    passengers[passId1].status=-4;
+                    if (SEC_GATES_ECHO) printf("\t\t SecGate %d failed check for p:%d\n", myGate->gateNumber, passId1);
+                }
             }
             else {
                 //ewakuacja przy stanowiskach security
                 passengers[passId1].status=0; 
-                if (SEC_GATES_ECHO) printf ("\t\t SecGate %d evacuated p:%s\n", myGate->gateNumber, passId1);
+                if (SEC_GATES_ECHO) printf ("\t\t SecGate %d evacuated p:%d\n", myGate->gateNumber, passId1);
             }
         }
         usleep(SEC_CHECK_WAIT);

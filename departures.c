@@ -28,6 +28,7 @@ volatile int planesOnboarded[MAX_PLANES]; // do sprawdzania czy mozemy jeszcze d
 volatile bool forceDeparture;
 volatile bool evacuate;
 volatile int currentPlanes;
+volatile bool endingDeparture;
 
 
 void evacuationReceivedDep()
@@ -126,6 +127,17 @@ void forceReceivedDep()
 	forceDeparture=false;
 }
 
+void endReceivedDep()
+{
+	printf("\t\t\tCleaning the departures hall. Good night!\n");
+	endingDeparture = true;
+	sleep(2);
+	mq_close(mqd);
+	mq_unlink("/DeparturesMQ");
+	unlink(s2d);
+	exit(0);	
+}
+
 void set_evachandler() {
 	struct sigaction current; /* current setup */
 	sigemptyset(&current.sa_mask); /* clear the signal set */
@@ -134,6 +146,8 @@ void set_evachandler() {
 	sigaction(SIGUSR1, &current, NULL); /* register the handler */
 	current.sa_handler = forceReceivedDep;
 	sigaction(SIGUSR2, &current, NULL);
+	current.sa_handler = endReceivedDep;
+	sigaction(SIGTERM, &current, NULL);
 }
 
 void departuresRun(void) {

@@ -25,6 +25,9 @@ int stairs_capacity = 5;
 int max_baggage = 90;
 int plane_capacity = 20; 
 
+//kolejki fifo, deskryptory
+int fd; 
+
 pthread_t *passengerThreads;
 
 void setup_passengers_shm() {
@@ -145,9 +148,29 @@ void simulationConfig() {
 
 }
 
+void endReceivedMain()
+{
+    printf("Cleaning the airport. See you again!\n");
+    close(fd);
+    unlink(m2t); // zamykamy przejscia miedzy salami
+    unlink(t2s);
+    unlink(s2d);
+    exit(0);    
+}
+
+
+void set_endhandler() {
+    struct sigaction current; /* current setup */
+    sigemptyset(&current.sa_mask); /* clear the signal set */
+    current.sa_flags = 0; /* for setting sa_handler, not sa_action */
+    current.sa_handler = endReceivedMain;
+    sigaction(SIGTERM, &current, NULL);
+}
+
 
 int main(int argc, char *argv[])
 {
+    set_endhandler(); // bedziemy czyscic kolejki na koncu symulacji
 	simulationConfig();
 	setup_passengers_shm();
 	//usunmy stre polaczenia, jesli istnieja
@@ -159,7 +182,7 @@ int main(int argc, char *argv[])
    	mkfifo(t2s, 0666); /* read/write for user/group/others */
    	mkfifo(s2d, 0666); /* read/write for user/group/others */
 
-	int fd = open(m2t, O_CREAT | O_WRONLY); /* open as write-only */
+	fd = open(m2t, O_CREAT | O_WRONLY); /* open as write-only */
 	if (fd < 0) return -1; /* can't go on */
 
 	int dfd = open(s2d, O_CREAT | O_WRONLY); /* open as write-only */
