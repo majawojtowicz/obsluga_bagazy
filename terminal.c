@@ -17,6 +17,9 @@ const char * terminalName = "Terminal";
 volatile bool noCheckins;
 volatile bool terevacuate;
 
+int mtfd; //przejscie: main -> terminal
+int tfd; // przejscie: terminal -> security
+
 void evacuationReceived()
 {
 	//signal(SIGUSR1, evacuationReceived);
@@ -59,6 +62,18 @@ void noCheckinsReceived()
 	noCheckins=true;
 }
 
+void endReceivedTerminal()
+{
+    printf("\tCleaning the terminal. See you again!\n");
+    close(mtfd);
+    unlink(m2t); // zamykamy przejscia miedzy salami
+
+    close(tfd);
+    unlink(t2s);
+
+    exit(0);    
+}
+
 void set_handler() {
 	struct sigaction current; /* current setup */
 	sigemptyset(&current.sa_mask); /* clear the signal set */
@@ -67,6 +82,8 @@ void set_handler() {
 	sigaction(SIGUSR1, &current, NULL); /* register the handler */
 	current.sa_handler = noCheckinsReceived; /* specify a handler */
 	sigaction(SIGRTMIN+1, &current, NULL); /* register the handler */
+	current.sa_handler = endReceivedTerminal; /* specify a handler */
+	sigaction(SIGTERM, &current, NULL); /* register the handler */
 }
 
 
@@ -110,16 +127,16 @@ void terminalRun(void) {
 	set_handler();
 
 	//zacznij nasluchiwac od wejscia glownego
-	int mfd = open(m2t, O_RDONLY);
-	if (mfd < 0) {
+	mtfd = open(m2t, O_RDONLY);
+	if (mtfd < 0) {
 		printf("\tTerminal entry is broken, cannot handle passengers. Exiting\n");
 		exit(1); /* no point in continuing */
 	}
 
 	//otworz korytarz z terminala do security
 	//mkfifo(t2s, 0666); /* read/write for user/group/others */
-	int fd = open(t2s, O_CREAT | O_WRONLY); /* open as write-only */
-	if (fd < 0) /* can't go on */
+	tfd = open(t2s, O_CREAT | O_WRONLY); /* open as write-only */
+	if (tfd < 0) /* can't go on */
 	{
 		printf("\tTerminal exit to security is broken, cannot handle passengers. Exiting\n");
 		exit(1); /* no point in continuing */		
@@ -130,7 +147,7 @@ void terminalRun(void) {
 		int next;
 		int i;
 		if (!noCheckins && !terevacuate) {
-			ssize_t count = read(mfd, &next, sizeof(int));	
+			ssize_t count = read(mtfd, &next, sizeof(int));	
 			if (count>0) {
 				bool passedCheckin=false;
 				if (TERMINAL_ECHO) printf("\tTerminal received p:%d\n", next);
@@ -146,7 +163,7 @@ void terminalRun(void) {
 				sem_post(semptr);
 				}
 				//jesli przeszedl kontrole wagi - wyslij dalej
-				if (passedCheckin) write(fd,&next, sizeof(int));
+				if (passedCheckin) write(tfd,&next, sizeof(int));
 			}
 		}
 		usleep(200000);
