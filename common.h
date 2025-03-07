@@ -54,6 +54,8 @@
 #define MAX_STATIONS       3   
 #define STATION_CAPACITY   2   
 
+#define SECURITY_THREAT    95 // poziom bezpieczenistwa, im liczba nizsza tym wieksza szansa ze pasazer nie przejdze (95/100 -> co 20 odpada, 90/100 -> co 10, itd.)
+
 
 #define MIN_PASSENGERS     1
 #define MAX_PASSENGERS     100
@@ -85,7 +87,9 @@ typedef struct {
     bool isVIP;
     bool isFemale;      
     int  assignedPlaneNumber; // plane = stairs
-    int status; //-3, dissatisfied, -2 - overweight, -1 - not sent, 0 - outside, 1 - terminal/check-in, 2 - security, 3 - departure hall, 4 - stairs, 5 - plane, 6 - delivered 
+    int status; //-3, dissatisfied, -2 - overweight, -1 - not sent, 0 - outside, 1 - terminal/check-in, 
+                // 2 - security, 3 - departure hall, 4 - stairs, 5 - plane, 6 - delivered 
+                // -4 - security check failed
 } Passenger;
 
 #define BackingFile "/shMemEx"
