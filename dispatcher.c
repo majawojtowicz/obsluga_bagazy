@@ -21,14 +21,6 @@ void printAirportStatus(pid_t terminalPid, pid_t securityPid, pid_t departuresPi
 		int delivered =0;
 		int waiting = 0;
 		if (!sem_wait(dsemptr)) {
-			printf ("ids    :\t");
-			for (int i=0;i<total_passengers;i++) 
-			{
-				if (i%10==0) printf(" ");
-				else printf("%d", i%10); 
-			} 
-			printf("\n");
-		
 			// print status z shared memory
 			printf("outside:\t");
 			for (int i=0;i<total_passengers;i++) {
